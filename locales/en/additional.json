@@ -1,0 +1,11 @@
+{
+    "modules": {
+      "chatWithYourMap": {
+        "createViewFailed": "Die Erstellung der Panorama-Ansicht ist fehlgeschlagen.",
+        "createViewFailedMoreInfo": "Die Panorama-Ansicht kann nicht angezeigt werden. Details dazu finden Sie in  der Entwickler-Konsole.",
+        "description": "Chatte mit deiner Karte",
+        "name": "Chat With Your Map",
+        "noData": "Für diese Position sind keine Panoramadaten verfügbar. Die Markierung wird auf die letzte Position zurückgesetzt."
+      }
+    }
+  }  
