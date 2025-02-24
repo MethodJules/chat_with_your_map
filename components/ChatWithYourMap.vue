@@ -15,7 +15,7 @@ export default {
     methods: {
         ...mapActions("Maps", ["setCenter", "setZoom", "placingPointMarker", "addLayer"]),
         ...mapActions("Menu", ["changeCurrentComponent"]),
-        ...mapMutations("Menu",["setExpandedBySide"]),
+        ...mapMutations("Menu", ["setExpandedBySide"]),
         goToLocation() {
             const code = mapCollection.getMapView("2D").getProjection().getCode()
             console.log(code)

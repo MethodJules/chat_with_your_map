@@ -1,11 +1,16 @@
 <script>
+import { MapCommandExecutor } from '../exectutors/map_command_executor';
 export default {
     data () {
         return {
             userInput: "",
             messages: [],
-            showTypingIndicator: false
+            showTypingIndicator: false,
+            executor: null
         };
+    },
+    created() {
+      this.executor = new MapCommandExecutor(this.$store);
     },
     methods:
     {
@@ -16,8 +21,11 @@ export default {
 
             // add user message to the chat
             this.messages.push({sender: "user", text: this.userInput});
-            this.userInput = "";
+            
 
+            const result = await this.executor.executeCommand(this.userInput);
+            console.log(result);
+            this.userInput = "";
             // Simulate bot typing
             this.showTypingIndicator = true;
 
