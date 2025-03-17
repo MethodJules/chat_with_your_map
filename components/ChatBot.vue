@@ -12,17 +12,15 @@ export default {
     created() {
       this.executor = new MapCommandExecutor(this.$store);
     },
-    methods:
-    {
+    methods: {
         async sendMessage () {
             if (this.userInput.trim() === "") {
                 return;
             }
 
-            // add user message to the chat
+            // Add user message to the chat
             this.messages.push({sender: "user", text: this.userInput});
             
-
             const result = await this.executor.executeCommand(this.userInput);
             console.log(result);
             this.userInput = "";
@@ -47,6 +45,7 @@ export default {
     }
 };
 </script>
+
 <template>
     <div class="chat-bot">
         <div class="chat-window">
@@ -66,16 +65,15 @@ export default {
                 <span class="dot" />
             </div>
         </div>
-        <div>
+        <div class="chat-input">
             <input
                 v-model="userInput"
                 type="text"
                 placeholder="Type your message..."
                 @keyup.enter="sendMessage"
+                class="input-field"
             >
-            <button @click="sendMessage">
-                Send
-            </button>
+            <button @click="sendMessage" class="send-button">Send</button>
         </div>
     </div>
 </template>
@@ -86,19 +84,21 @@ export default {
   max-width: 400px;
   margin: 0 auto;
   border: 1px solid #ccc;
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
-  background-color: #f9f9f9;
+  background-color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .chat-window {
   flex: 1;
-  padding: 10px;
+  padding: 15px;
   overflow-y: auto;
   height: 300px;
   display: flex;
   flex-direction: column;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .chat-message {
@@ -109,48 +109,65 @@ export default {
   align-self: flex-end;
   background-color: #007bff;
   color: white;
-  padding: 5px 10px;
-  border-radius: 15px;
+  padding: 10px 15px;
+  border-radius: 20px;
   max-width: 70%;
   word-wrap: break-word;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
 }
 
 .chat-message .bot {
   align-self: flex-start;
   background-color: #e9ecef;
   color: black;
-  padding: 5px 10px;
-  border-radius: 15px;
+  padding: 10px 15px;
+  border-radius: 20px;
   max-width: 70%;
   word-wrap: break-word;
+  box-shadow: 0 2px 4px rgba(233, 236, 239, 0.5);
 }
 
 .chat-input {
   display: flex;
   padding: 10px;
-  border-top: 1px solid #ccc;
-  background-color: white;
+  border-top: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
 }
 
-.chat-input input {
+.input-field {
   flex: 1;
-  padding: 8px;
+  padding: 8px 12px; 
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 20px; 
+  outline: none;
+  transition: border-color 0.3s;
+  background-color: #ffffff; 
 }
 
-.chat-input button {
-  margin-left: 8px;
-  padding: 8px 16px;
+.input-field:focus {
+  border-color: #007bff; 
+}
+
+.send-button {
+  margin-left: 10px;
+  padding: 8px 12px; 
   border: none;
-  border-radius: 4px;
-  background-color: #007bff;
-  color: white;
+  border-radius: 20px; 
+  background-color: #007bff; 
+  color: white; 
   cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2); 
 }
 
-.chat-input button:hover {
-  background-color: #0056b3;
+.send-button:hover {
+  background-color: #0056b3; 
+  transform: translateY(-1px); 
+}
+
+.send-button:active {
+  background-color: #004494; 
+  transform: translateY(0); 
 }
 
 .typing-indicator {
@@ -160,9 +177,9 @@ export default {
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
-  margin: 0 3px;
+  width: 10px;
+  height: 10px;
+  margin: 0 4px;
   background-color: #007bff;
   border-radius: 50%;
   animation: jump 1.5s infinite;
