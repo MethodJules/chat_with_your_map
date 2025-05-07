@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "chat-with-your-map"
+version = "0.1.0"
+description = ""
+authors = ["MethodJules <julien.hofer@gv.hamburg.de>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic-ai = "^0.1.9"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

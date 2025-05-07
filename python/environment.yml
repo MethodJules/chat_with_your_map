@@ -1,0 +1,7 @@
+channels:
+  - defaults
+  - conda-forge
+  - pip
+dependencies:
+  - python=3.10
+  - poetry=1.8.1
