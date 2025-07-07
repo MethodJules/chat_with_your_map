@@ -9,8 +9,8 @@ export default {
             executor: null
         };
     },
-    created() {
-      this.executor = new MapCommandExecutor(this.$store);
+    created () {
+        this.executor = new MapCommandExecutor(this.$store);
     },
     methods: {
         async sendMessage () {
