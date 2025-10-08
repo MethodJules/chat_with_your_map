@@ -124,7 +124,7 @@ export default {
             // Set map center
             if (center) {
                 this.setCenter(center);
-                console.log(`Navigated to:  ${location.name} at coordinates [${center.join(', ')}]`);
+                console.log(`Navigated to:  ${location.name} at coordinates [${center.join(", ")}]`);
             }
 
             // Set zoom level
@@ -139,7 +139,7 @@ export default {
 
             // Create bounding box polygon if available
             if (boundingBox && options.highlight) {
-                this.createBoundingBoxPolygon(boundingBox, options.style)
+                this.createBoundingBoxPolygon(boundingBox, options.style);
             }
         },
 
@@ -160,9 +160,12 @@ export default {
          * Apply filters to a layer
          */
         async applyFilters (layer, filters) {
-            if (!layer?.id) return;
+            if (!layer?.id) {
+                return;
+            }
 
             const targetLayer = layerCollection.getLayerById(layer.id);
+
             if (!targetLayer) {
                 console.warn(`Layer with ID ${layer.id} not found`);
                 return;
@@ -171,6 +174,7 @@ export default {
             console.log(`Applying ${filters.length} filter(s) to layer ${layer.name}`);
 
             // Get all feature from the layer
+            // eslint-disable-next-line
             const features = targetLayer.layerSource.getFeatures();
 
             // Apply each filter
@@ -194,7 +198,7 @@ export default {
                             shouldShow = shouldShow && String(featureValue).includes(filter.value);
                             break;
                         case "between":
-                            shouldShow = shouldShow && featureValue >= filter.value[0] && featureValue <= filter.value[1]
+                            shouldShow = shouldShow && featureValue >= filter.value[0] && featureValue <= filter.value[1];
                             break;
                         default:
                             console.warn(`Unknown filter operator: ${filter.operator}`);
@@ -337,8 +341,8 @@ export default {
                 if ((/fahrradstation(en)? in altona/i).test(query)) {
                     const exampleCommand = {
                         "command": {
-                            "action": { "type": "Zeigen", "confidence": 0.95 },
-                            "layer": { "name": "Fahrradstationen", "id": "18105", "confidence": 0.92 },
+                            "action": {"type": "Zeigen", "confidence": 0.95},
+                            "layer": {"name": "Fahrradstationen", "id": "18105", "confidence": 0.92},
                             "location": {
                                 "type": "district",
                                 "name": "Altona",
@@ -353,7 +357,7 @@ export default {
                                 "zoom": 5,
                                 "addMarker": true,
                                 "highlight": false,
-                                "style": { "fill": "rgba(255, 100, 50, 0.5)", "stroke": { "color": "#ff6432", "width": 2 } }
+                                "style": {"fill": "rgba(255, 100, 50, 0.5)", "stroke": {"color": "#ff6432", "width": 2}}
                             },
                             "rawQuery": query
                         },
@@ -363,6 +367,7 @@ export default {
                             "processingTimeMs": 100
                         }
                     };
+
                     this.executeMapCommand(exampleCommand);
                     return exampleCommand;
                 }
@@ -370,7 +375,7 @@ export default {
                 if ((/kontaktformular/i).test(query)) {
                     const exampleCommand = {
                         "command": {
-                            "action": { "type": "Öffne", "confidence": 0.95 },
+                            "action": {"type": "Öffne", "confidence": 0.95},
                             "tool": {
                                 "name": "Kontakt",
                                 "tool": "contact",
@@ -382,7 +387,7 @@ export default {
                                     "noConfigProps": true
                                 }
                             },
-                            "options": { "expanded": true },
+                            "options": {"expanded": true},
                             "rawQuery": query
                         },
                         "metadata": {
@@ -391,12 +396,13 @@ export default {
                             "processingTimeMs": 100
                         }
                     };
+
                     this.executeMapCommand(exampleCommand);
                     return exampleCommand;
                 }
 
                 // Fallback: real API call
-                const response = await fetch("http://10.200.160.182:7070/masterportal", {
+                const response = await fetch("https://localhost:8443", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({"input_text": query})
@@ -502,6 +508,23 @@ export default {
             };
 
             await this.executeMapCommand(exampleCommand);
+        },
+
+        async enableTool () {
+            this.$store.commit("Modules/Contact/setMail", "julien.hofer@gv.hamburg.de");
+            this.$store.commit("Modules/Contact/setPhone", "017444444444");
+            this.changeCurrentComponent({
+                type: "contact",
+                side: "secondaryMenu",
+                props: {
+                    name: "contact",
+                    infoMessage: "Test Message",
+                    subject: "Igrendwas",
+                    noConfigProps: true
+                }
+            });
+            this.setExpandedBySide({ expanded: true, side: "secondaryMenu" });
+
         },
 
         async testToolCommand () {
@@ -617,7 +640,9 @@ export default {
                         <p>Processing command...</p>
                     </div>
                 </div>
-
+                <div>
+                    <button class="btn btn-primary control-buttons" @click="enableTool">Test Show Command</button>
+                </div>
                 <!-- Command history -->
                 <div v-if="commandHistory.length > 0" class="command-history">
                     <h4>Recent Commands:</h4>
