@@ -43,24 +43,23 @@ export default {
                 return null;
             }
 
-            const transformedCoords = locations.map(loc => 
-                this.transformCoordinates(
-                    loc.coordinates.longitude, 
+            const transformedCoords = locations.map(loc => this.transformCoordinates(
+                    loc.coordinates.longitude,
                     loc.coordinates.latitude
                 )
-            );
+                ),
 
-            const xs = transformedCoords.map(c => c[0]);
-            const ys = transformedCoords.map(c => c[1]);
+                xs = transformedCoords.map(c => c[0]),
+                ys = transformedCoords.map(c => c[1]),
 
-            const minX = Math.min(...xs);
-            const maxX = Math.max(...xs);
-            const minY = Math.min(...ys);
-            const maxY = Math.max(...ys);
+                minX = Math.min(...xs),
+                maxX = Math.max(...xs),
+                minY = Math.min(...ys),
+                maxY = Math.max(...ys),
 
-            // Add padding (10% on each side)
-            const paddingX = (maxX - minX) * 0.1;
-            const paddingY = (maxY - minY) * 0.1;
+                // Add padding (10% on each side)
+                paddingX = (maxX - minX) * 0.1,
+                paddingY = (maxY - minY) * 0.1;
 
             return [
                 [minX - paddingX, minY - paddingY],
@@ -71,40 +70,54 @@ export default {
         /**
          * Main method to execute map commands from json
          */
-        executeMapCommand (commandJson) {
+        executeMapCommand (responseData) {
             try {
                 this.isProcessing = true;
-                console.log("Executing command: ", commandJson);
+                console.log("Executing command: ", responseData);
+
+                // Check if response is successful
+                if (!responseData.success) {
+                    console.error("Command execution failed:", responseData);
+                    return {
+                        success: false,
+                        message: responseData.text_response || "Command execution failed"
+                    };
+                }
+
+                const {data} = responseData,
+                    command = data.command,
+                    requestId = `req-${Date.now()}`;
 
                 // Store command in history
                 this.commandHistory.push({
-                    ...commandJson,
-                    executedAt: new Date().toISOString()
+                    query: data.query,
+                    command: command,
+                    layers: data.layers,
+                    locations: data.locations,
+                    executedAt: new Date().toISOString(),
+                    requestId: requestId
                 });
-
-                const {command} = commandJson;
-                const requestId = commandJson.metadata.requestId;
 
                 // Initialize tracking for this command
                 this.activatedLayersByCommand[requestId] = {
                     layers: [],
                     locations: [],
-                    timestamp: commandJson.metadata.timestamp
+                    timestamp: new Date().toISOString()
                 };
 
                 // Execute action based on type
                 switch (command.action.type.toLowerCase()) {
                     case "zeigen":
-                        this.executeShowCommand(command, requestId);
+                        this.executeShowCommand(data, requestId); // FIXED: Pass 'data' not 'command'
                         break;
                     case "navigieren":
-                        this.navigateToLocations(command.locations, command.options, requestId);
+                        this.navigateToLocations(data.locations?.locations, {}, requestId);
                         break;
                     case "filter":
-                        this.executeFilterCommand(command);
+                        this.executeFilterCommand(data);
                         break;
                     case "öffne":
-                        this.executeToolCommand(command);
+                        this.executeToolCommand(data);
                         break;
                     default:
                         console.warn(`Unknown action type: ${command.action.type}`);
@@ -112,10 +125,19 @@ export default {
                 }
 
                 this.lastCommand = requestId;
+
+                return {
+                    success: true,
+                    message: responseData.text_response,
+                    requestId: requestId
+                };
             }
             catch (error) {
                 console.error("Error executing map command", error);
-                throw error;
+                return {
+                    success: false,
+                    message: "Es gab einen Fehler bei der Ausführung des Befehls"
+                };
             }
             finally {
                 this.isProcessing = false;
@@ -123,45 +145,41 @@ export default {
         },
 
         /**
-         * Execute show commands - handles multiple layers and locations
+         * Execute show commands - handles layers and locations from new structure
          */
-        executeShowCommand (command, requestId) {
-            // Handle multiple layers
-            if (command.layers && Array.isArray(command.layers)) {
-                this.handleMultipleLayerVisibility(command.layers, true, requestId);
-            }
-            // Fallback to single layer (backwards compatibility)
-            else if (command.layer) {
-                this.handleLayerVisibility(command.layer, true, requestId);
+        executeShowCommand (data, requestId) {
+            // Handle layers from new structure
+            // New structure: data.layers.layers (single layer object)
+            if (data.layers && data.layers.layers) {
+                // Convert single layer to array for compatibility
+                const layerArray = [data.layers.layers];
+                this.handleMultipleLayerVisibility(layerArray, true, requestId); // FIXED: Correct parameter order
             }
 
-            // Handle multiple locations
-            if (command.locations && Array.isArray(command.locations)) {
-                this.navigateToLocations(command.locations, command.options, requestId);
-            }
-            // Fallback to single location (backwards compatibility)
-            else if (command.location) {
-                this.navigateToLocation(command.location, command.options);
+            // Handle locations from new structure
+            // New structure: data.locations.locations (array)
+            if (data.locations && data.locations.locations && Array.isArray(data.locations.locations)) {
+                this.navigateToLocations(data.locations.locations, {}, requestId); // FIXED: Call correct method
             }
         },
 
         /**
          * Handle visibility for multiple layers simultaneously
          */
-        handleMultipleLayerVisibility (layers, visible = true, requestId) {
+        handleMultipleLayerVisibility (layers, visible = true, requestId) { // FIXED: Correct parameter order
             console.log(`Activating ${layers.length} layers simultaneously`);
-            
+
             const activatedLayers = [];
 
             layers.forEach(layer => {
                 if (layer.id) {
                     try {
                         this.changeVisibility({
-                            layerId: layer.id.toString(),
+                            layerId: layer.id,
                             value: visible
                         });
-                        
-                        activatedLayers.push(layer.id.toString());
+
+                        activatedLayers.push(layer.id);
                         console.log(`✓ Layer ${layer.name} (${layer.id}) activated (confidence: ${layer.confidence})`);
                     }
                     catch (error) {
@@ -188,14 +206,14 @@ export default {
             if (layer.id) {
                 try {
                     this.changeVisibility({
-                        layerId: layer.id.toString(),
+                        layerId: layer.id,
                         value: visible
                     });
-                    
+
                     if (requestId && this.activatedLayersByCommand[requestId]) {
                         this.activatedLayersByCommand[requestId].layers.push(layer.id.toString());
                     }
-                    
+
                     console.log(`Layer ${layer.name} (${layer.id}) visibility set to ${visible}`);
                 }
                 catch (error) {
@@ -226,523 +244,338 @@ export default {
 
             // Track locations for this command
             if (requestId && this.activatedLayersByCommand[requestId]) {
-                this.activatedLayersByCommand[requestId].locations = locations.map(l => l.name);
+                this.activatedLayersByCommand[requestId].locations = locations.map(loc => loc.name);
             }
 
-            // If single location, use existing logic
-            if (transformedLocations.length === 1) {
+            if (locations.length === 1) {
+                // Single location - navigate directly
                 const loc = transformedLocations[0];
-                const center = loc.transformedCoords;
-
-                this.setCenter(center);
-                console.log(`Navigated to: ${loc.name} at [${center.join(", ")}]`);
-
-                if (options.zoom) {
-                    this.setZoom(options.zoom);
-                }
-
-                if (options.addMarker) {
-                    this.placingPointMarker(center);
-                }
-
-                return;
-            }
-
-            // Multiple locations: calculate bounding box and fit view
-            const boundingBox = this.calculateBoundingBox(locations);
-            
-            if (boundingBox) {
-                // Calculate center of bounding box
-                const [min, max] = boundingBox;
-                const center = [
-                    (min[0] + max[0]) / 2,
-                    (min[1] + max[1]) / 2
-                ];
-
-                this.setCenter(center);
-                console.log(`Centered view on ${locations.length} locations`);
-
-                // Add markers for all locations if requested
-                if (options.addMarker) {
-                    transformedLocations.forEach(loc => {
-                        this.placingPointMarker(loc.transformedCoords);
-                        console.log(`Added marker for: ${loc.name}`);
-                    });
-                }
-
-                // Highlight all locations if requested
-                if (options.highlight) {
-                    this.createMultiLocationHighlight(transformedLocations, options.style);
-                }
-
-                // Zoom to fit all locations (calculate appropriate zoom level)
-                // You might need to adjust this based on your map's behavior
-                if (options.zoom) {
-                    this.setZoom(options.zoom);
-                }
-            }
-        },
-
-        /**
-         * Navigate to a specific location (single - backwards compatibility)
-         */
-        navigateToLocation (location, options = {}) {
-            console.log(`Navigating to location: ${location.name}`);
-            
-            if (!location.coordinates) {
-                return;
-            }
-
-            const {center, boundingBox} = location.coordinates;
-
-            // Set map center
-            if (center) {
-                this.setCenter(center);
-                console.log(`Navigated to: ${location.name} at coordinates [${center.join(", ")}]`);
-            }
-
-            // Set zoom level
-            if (options.zoom) {
-                this.setZoom(options.zoom);
-            }
-
-            // Add marker if requested
-            if (options.addMarker && center) {
-                this.placingPointMarker(center);
-            }
-
-            // Create bounding box polygon if available
-            if (boundingBox && options.highlight) {
-                this.createBoundingBoxPolygon(boundingBox, options.style);
-            }
-        },
-
-        /**
-         * Create highlights for multiple locations
-         */
-        createMultiLocationHighlight (transformedLocations, style = {}) {
-            // Get or create highlight layer
-            let highlightLayer = layerCollection.getLayerById("command-highlight-layer");
-
-            if (!highlightLayer) {
-                highlightLayer = new VectorLayer({
-                    id: "command-highlight-layer",
-                    name: "Command Highlights",
-                    source: new VectorSource(),
-                    alwaysOnTop: true
-                });
-                this.addLayer(highlightLayer);
-            }
-
-            // Clear existing highlights
-            highlightLayer.getSource().clear();
-
-            // Create circular highlights for each location
-            transformedLocations.forEach(loc => {
-                const center = loc.transformedCoords;
-                const radius = 500; // 500 meters radius
-
-                // Create circle polygon
-                const circleCoords = [];
-                const sides = 32;
-                
-                for (let i = 0; i <= sides; i++) {
-                    const angle = (i / sides) * 2 * Math.PI;
-                    const x = center[0] + radius * Math.cos(angle);
-                    const y = center[1] + radius * Math.sin(angle);
-                    circleCoords.push([x, y]);
-                }
-
-                const polygon = new Polygon([circleCoords]);
-                const feature = new Feature({
-                    geometry: polygon,
-                    type: "command-highlight",
-                    locationName: loc.name
-                });
-
-                const polygonStyle = new Style({
-                    fill: new Fill({
-                        color: style?.fill || "rgba(255, 100, 50, 0.3)"
-                    }),
-                    stroke: new Stroke({
-                        color: style?.stroke?.color || "#ff6432",
-                        width: style?.stroke?.width || 2
-                    })
-                });
-
-                feature.setStyle(polygonStyle);
-                highlightLayer.getSource().addFeature(feature);
-                
-                console.log(`Created highlight for: ${loc.name}`);
-            });
-        },
-
-        /**
-         * Execute open tool commands
-         */
-        executeToolCommand (command) {
-            if (!command.tool) {
-                return;
-            }
-
-            this.changeCurrentComponent({
-                type: command.tool.tool,
-                side: command.tool.side,
-                props: command.tool.props
-            });
-
-            // Set expanded state if provided
-            if (command.options?.expanded) {
-                this.setExpandedBySide({
-                    side: command.tool.side || "left",
-                    expanded: command.options.expanded
-                });
-            }
-
-            console.log(`Opened tool: ${command.tool.name}`);
-        },
-
-        /**
-         * Apply filters to a layer
-         */
-        async applyFilters (layer, filters) {
-            if (!layer?.id) {
-                return;
-            }
-
-            const targetLayer = layerCollection.getLayerById(layer.id);
-
-            if (!targetLayer) {
-                console.warn(`Layer with ID ${layer.id} not found`);
-                return;
-            }
-
-            console.log(`Applying ${filters.length} filter(s) to layer ${layer.name}`);
-
-            const features = targetLayer.layerSource.getFeatures();
-
-            // Apply each filter
-            features.forEach(feature => {
-                let shouldShow = true;
-
-                filters.forEach(filter => {
-                    const featureValue = feature.get(filter.property);
-
-                    switch (filter.operator) {
-                        case "greaterThan":
-                            shouldShow = shouldShow && (featureValue > filter.value);
-                            break;
-                        case "lessThan":
-                            shouldShow = shouldShow && (featureValue < filter.value); // FIXED BUG
-                            break;
-                        case "equals":
-                            shouldShow = shouldShow && (featureValue === filter.value);
-                            break;
-                        case "contains":
-                            shouldShow = shouldShow && String(featureValue).includes(filter.value);
-                            break;
-                        case "between":
-                            shouldShow = shouldShow && featureValue >= filter.value[0] && featureValue <= filter.value[1];
-                            break;
-                        default:
-                            console.warn(`Unknown filter operator: ${filter.operator}`);
-                    }
-                });
-
-                // Hide/show feature based on filter result
-                feature.setStyle(shouldShow ? null : new Style({}));
-            });
-        },
-
-        /**
-         * Create a polygon from bounding box coordinates
-         */
-        async createBoundingBoxPolygon (boundingBox, style = {}, targetLayer = null) {
-            const [minCoords, maxCoords] = boundingBox;
-            const coordinates = [[
-                [minCoords[0], minCoords[1]], // bottom-left
-                [maxCoords[0], minCoords[1]], // bottom-right
-                [maxCoords[0], maxCoords[1]], // top-right
-                [minCoords[0], maxCoords[1]], // top-left
-                [minCoords[0], minCoords[1]] // close polygon
-            ]];
-
-            const polygon = new Polygon(coordinates);
-            const polygonFeature = new Feature({
-                geometry: polygon,
-                type: "command-highlight"
-            });
-
-            const polygonStyle = new Style({
-                fill: new Fill({
-                    color: style?.fill || "rgba(255, 100, 50, 0.3)"
-                }),
-                stroke: new Stroke({
-                    color: style?.stroke?.color || "#ff6432",
-                    width: style?.stroke?.width || 2
-                })
-            });
-
-            polygonFeature.setStyle(polygonStyle);
-
-            if (targetLayer) {
-                targetLayer.getSource().addFeature(polygonFeature);
+                this.navigateToSingleLocation(loc, options);
             }
             else {
-                const tempLayer = new VectorLayer({
-                    id: `temp-highlight-${Date.now()}`,
-                    name: "Temporary Highlight",
-                    source: new VectorSource(),
-                    alwaysOnTop: true
-                });
-
-                tempLayer.getSource().addFeature(polygonFeature);
-                this.addLayer(tempLayer);
+                // Multiple locations - fit view to bounding box
+                this.fitViewToMultipleLocations(transformedLocations, options); // FIXED: Corrected method name
             }
 
-            console.log("Created bounding box polygon with styling");
+            // Add markers for all locations
+            if (options.showMarkers !== false) {
+                this.addLocationMarkers(transformedLocations, options);
+            }
+
+            // Add bounding box visualization if requested
+            if (options.showBoundingBox) {
+                this.visualizeBoundingBox(locations);
+            }
         },
 
         /**
-         * Clear all command-related highlights and deactivate layers from a specific command
+         * Navigate to a single location
          */
-        clearCommandLayers (requestId = null) {
-            const targetId = requestId || this.lastCommand;
+        navigateToSingleLocation (location, options = {}) {
+            const coords = location.transformedCoords;
+            const zoom = options.zoom || 5;
 
-            if (!targetId || !this.activatedLayersByCommand[targetId]) {
-                console.warn(`No command found with ID: ${targetId}`);
+            console.log(`Navigating to ${location.name} at [${coords}] with zoom ${zoom}`);
+
+            this.setCenter(coords);
+            this.setZoom(zoom);
+        },
+
+        /**
+         * Fit view to multiple locations
+         */
+        fitViewToMultipleLocations (transformedLocations, options = {}) { // FIXED: Corrected method name
+            const originalLocations = transformedLocations.map(loc => ({
+                name: loc.name,
+                coordinates: {
+                    latitude: loc.coordinates.latitude,
+                    longitude: loc.coordinates.longitude
+                }
+            }));
+
+            const bbox = this.calculateBoundingBox(originalLocations);
+
+            if (bbox) {
+                const center = [
+                    (bbox[0][0] + bbox[1][0]) / 2,
+                    (bbox[0][1] + bbox[1][1]) / 2
+                ];
+
+                console.log(`Fitting view to ${transformedLocations.length} locations with center at [${center}]`);
+                this.setCenter(center);
+
+                // Calculate appropriate zoom level based on bounding box size
+                const width = bbox[1][0] - bbox[0][0],
+                    height = bbox[1][1] - bbox[0][1],
+                    maxDimension = Math.max(width, height);
+
+                // Rough zoom calculation (can be refined based on your map settings)
+                let zoom = 15;
+
+                if (maxDimension > 50000) {
+                    zoom = 10;
+                }
+                else if (maxDimension > 20000) {
+                    zoom = 12;
+                }
+                else if (maxDimension > 10000) {
+                    zoom = 13;
+                }
+
+                this.setZoom(options.zoom || zoom);
+            }
+        },
+
+        /**
+         * Add markers for locations
+         */
+        addLocationMarkers (locations, options = {}) {
+            locations.forEach(location => {
+                this.placingPointMarker({
+                    coordinates: location.transformedCoords,
+                    label: location.name
+                });
+                console.log(`✓ Marker added for ${location.name}`);
+            });
+        },
+
+        /**
+         * Visualize bounding box around locations
+         */
+        visualizeBoundingBox (locations) {
+            const bbox = this.calculateBoundingBox(locations);
+            if (!bbox) {
                 return;
             }
 
-            const commandData = this.activatedLayersByCommand[targetId];
+            // Create polygon feature for bounding box
+            const polygon = new Polygon([[
+                [bbox[0][0], bbox[0][1]], // bottom-left
+                [bbox[1][0], bbox[0][1]], // bottom-right
+                [bbox[1][0], bbox[1][1]], // top-right
+                [bbox[0][0], bbox[1][1]], // top-left
+                [bbox[0][0], bbox[0][1]]  // close polygon
+            ]]);
 
-            // Deactivate all layers from this command
-            commandData.layers.forEach(layerId => {
+            const feature = new Feature({
+                geometry: polygon
+            });
+
+            feature.setStyle(new Style({
+                stroke: new Stroke({
+                    color: "rgba(255, 0, 0, 0.8)",
+                    width: 2
+                }),
+                fill: new Fill({
+                    color: "rgba(255, 0, 0, 0.1)"
+                })
+            }));
+
+            // Create vector layer for bounding box
+            const vectorSource = new VectorSource({
+                features: [feature]
+            });
+
+            const vectorLayer = new VectorLayer({
+                source: vectorSource,
+                name: "BoundingBox_Overlay",
+                id: `bbox_${Date.now()}`
+            });
+
+            this.addLayer({layer: vectorLayer});
+            console.log("✓ Bounding box visualization added");
+        },
+
+        /**
+         * Navigate to single location (backwards compatibility)
+         */
+        navigateToLocation (location, options = {}) {
+            const transformedCoords = this.transformCoordinates(
+                location.coordinates.longitude,
+                location.coordinates.latitude
+            );
+
+            const zoom = options.zoom || 15;
+
+            console.log(`Navigating to ${location.name} at [${transformedCoords}] with zoom ${zoom}`);
+
+            this.setCenter(transformedCoords);
+            this.setZoom(zoom);
+
+            // Add marker if requested
+            if (options.showMarker !== false) {
+                this.placingPointMarker({
+                    coordinates: transformedCoords,
+                    label: location.name
+                });
+            }
+        },
+
+        /**
+         * Execute filter commands
+         */
+        executeFilterCommand (data) {
+            console.log("Filter command execution not yet implemented");
+            // TODO: Implement filter logic
+        },
+
+        /**
+         * Execute tool commands (e.g., opening specific tools)
+         */
+        executeToolCommand (data) {
+            console.log("Tool command execution not yet implemented");
+            // TODO: Implement tool opening logic
+        },
+
+        /**
+         * Clear layers activated by current command
+         */
+        clearCommandLayers () {
+            if (!this.lastCommand || !this.activatedLayersByCommand[this.lastCommand]) {
+                console.warn("No active command to clear");
+                return;
+            }
+
+            const commandInfo = this.activatedLayersByCommand[this.lastCommand];
+
+            console.log(`Clearing ${commandInfo.layers.length} layers from command ${this.lastCommand}`);
+
+            commandInfo.layers.forEach(layerId => {
                 try {
                     this.changeVisibility({
                         layerId: layerId,
                         value: false
                     });
-                    console.log(`Deactivated layer: ${layerId}`);
+                    console.log(`✓ Layer ${layerId} deactivated`);
                 }
                 catch (error) {
-                    console.error(`Failed to deactivate layer ${layerId}:`, error.message);
+                    console.error(`✗ Failed to deactivate layer ${layerId}:`, error);
                 }
             });
 
-            // Clear highlights
-            const highlightLayer = layerCollection.getLayerById("command-highlight-layer");
-            if (highlightLayer) {
-                highlightLayer.getSource().clear();
-            }
-
             // Remove from tracking
-            delete this.activatedLayersByCommand[targetId];
-
-            console.log(`Cleaned up command ${targetId}: deactivated ${commandData.layers.length} layers`);
+            delete this.activatedLayersByCommand[this.lastCommand];
+            this.lastCommand = null;
         },
 
         /**
-         * Clear ALL command-activated layers
+         * Clear all layers from all commands
          */
         clearAllCommandLayers () {
+            console.log("Clearing all command layers");
+
             Object.keys(this.activatedLayersByCommand).forEach(requestId => {
-                this.clearCommandLayers(requestId);
+                const commandInfo = this.activatedLayersByCommand[requestId];
+
+                commandInfo.layers.forEach(layerId => {
+                    try {
+                        this.changeVisibility({
+                            layerId: layerId,
+                            value: false
+                        });
+                    }
+                    catch (error) {
+                        console.error(`Failed to deactivate layer ${layerId}:`, error);
+                    }
+                });
             });
 
-            console.log("Cleared all command-activated layers");
+            // Clear all tracking
+            this.activatedLayersByCommand = {};
+            this.lastCommand = null;
+            this.commandHistory = [];
         },
 
         /**
-         * Mock data for testing multi-layer and multi-location functionality
+         * Generate mock response with new backend structure
          */
         getMockResponse (query) {
-            // Multi-layer, multi-location example (Parkplätze + Bahnhalt + Fahrrad in Altona + Wandsbek)
-            if (/parkplätze|bahnhalt|fahrrad/i.test(query)) {
+            const lowerQuery = query.toLowerCase();
+
+            // Mock response matching new backend structure
+            if (lowerQuery.includes("fahrrad") || lowerQuery.includes("bike") || lowerQuery.includes("fahrräder")) {
                 return {
-                    "command": {
-                        "action": {
-                            "type": "Zeigen",
-                            "confidence": 0.98
-                        },
-                        "options": {
-                            "layer": [
-                                "Parkplätze",
-                                "Bahnhalt",
-                                "Fahrradsparkplätze"
-                            ],
-                            "region": [
-                                "Altona",
-                                "Wandsbek"
-                            ],
-                            "zoom": 4,
-                            "addMarker": true,
-                            "highlight": true
-                        },
-                        "layers": [
-                            {
-                                "name": "Parkhäuser",
-                                "id": "34291",
-                                "confidence": 0.8
-                            },
-                            {
-                                "name": "P + R",
-                                "id": "29124",
-                                "confidence": 0.7
-                            },
-                            {
-                                "name": "Fahrradbügel",
-                                "id": "32641",
-                                "confidence": 0.9
-                            },
-                            {
-                                "name": "Fahrradabstellanlagen",
-                                "id": "30580",
-                                "confidence": 0.85
-                            },
-                            {
-                                "name": "Bahnhof",
-                                "id": "14523",
-                                "confidence": 0.95
-                            },
-                            {
-                                "name": "Haltestellen",
-                                "id": "14526",
-                                "confidence": 0.9
-                            },
-                            {
-                                "name": "Bahnstationen",
-                                "id": "16603",
-                                "confidence": 0.85
-                            },
-                            {
-                                "name": "Fahrradparkplätze",
-                                "id": "32638",
-                                "confidence": 0.8
-                            }
-                        ],
-                        "locations": [
-                            {
-                                "name": "Altona",
-                                "coordinates": {
-                                    "latitude": 53.5864667,
-                                    "longitude": 9.7776709
-                                },
-                                "confidence": 0.95
-                            },
-                            {
-                                "name": "Wandsbek",
-                                "coordinates": {
-                                    "latitude": 53.5760029,
-                                    "longitude": 10.0755348
-                                },
+                    "success": true,
+                    "text_response": "Hallo! Du hast nach allen frei verfügbaren Fahrrädern in Wandsbek gefragt. Ich habe deine Anfrage bearbeitet und die \"Anzahl frei verfügbarer Fahrräder je StadtRad-Station\"-Schicht identifiziert, die am besten zu deiner Suche passt. Ich kann dir jetzt alle relevanten Fahrradstationen in Wandsbek anzeigen, lass uns loslegen!",
+                    "data": {
+                        "query": query,
+                        "reasoning": "The query asks to display bike stations in a specific location.",
+                        "command": {
+                            "action": {
+                                "type": "Zeigen",
                                 "confidence": 0.95
                             }
-                        ],
-                        "rawQuery": query
-                    },
-                    "metadata": {
-                        "requestId": `mock-${Date.now()}`,
-                        "timestamp": new Date().toISOString()
-                    }
-                };
-            }
-
-            // Single location example (LGV Hamburg)
-            if (/lgv/i.test(query)) {
-                return {
-                    "command": {
-                        "action": {
-                            "type": "Zeigen",
-                            "confidence": 0.95
                         },
-                        "options": {
-                            "zoom": 5,
-                            "addMarker": true,
-                            "highlight": true
-                        },
-                        "locations": [
-                            {
-                                "name": "LGV Hamburg",
-                                "coordinates": {
-                                    "latitude": 53.551086,
-                                    "longitude": 9.993682
-                                },
-                                "confidence": 0.88
-                            }
-                        ],
-                        "rawQuery": query
-                    },
-                    "metadata": {
-                        "requestId": `mock-lgv-${Date.now()}`,
-                        "timestamp": new Date().toISOString()
-                    }
-                };
-            }
-
-            // Tool opening example (Kontaktformular)
-            if (/kontakt/i.test(query)) {
-                return {
-                    "command": {
-                        "action": {
-                            "type": "Öffne",
-                            "confidence": 0.95
-                        },
-                        "tool": {
-                            "name": "Kontakt",
-                            "tool": "contact",
-                            "side": "secondaryMenu",
-                            "props": {
-                                "name": "contact",
-                                "infoMessage": "Schreiben Sie uns Ihre Anfrage",
-                                "subject": "Irgendwas",
-                                "noConfigProps": true
+                        "layers": {
+                            "layers": {
+                                "name": "StadtRAD-Stationen Hamburg",
+                                "id": "18105",
+                                "confidence": 0.92
                             }
                         },
-                        "options": {
-                            "expanded": true
-                        },
-                        "rawQuery": query
-                    },
-                    "metadata": {
-                        "requestId": `mock-kontakt-${Date.now()}`,
-                        "timestamp": new Date().toISOString()
-                    }
-                };
-            }
-
-            // Default fallback mock
-            return {
-                "command": {
-                    "action": {
-                        "type": "Zeigen",
-                        "confidence": 0.8
-                    },
-                    "options": {
-                        "zoom": 4,
-                        "addMarker": true
-                    },
-                    "locations": [
-                        {
-                            "name": "Hamburg Zentrum",
-                            "coordinates": {
-                                "latitude": 53.5511,
-                                "longitude": 9.9937
-                            },
-                            "confidence": 0.9
+                        "locations": {
+                            "locations": [
+                                {
+                                    "name": "Wandsbek",
+                                    "coordinates": {
+                                        "latitude": 53.5760029,
+                                        "longitude": 10.0755348
+                                    },
+                                    "confidence": 0.95
+                                }
+                            ]
                         }
-                    ],
-                    "rawQuery": query
+                    },
+                    "metadata": {
+                        "num_agent_calls": 3,
+                        "reasoning": null
+                    }
+                };
+            }
+
+            // Default mock response
+            return {
+                "success": true,
+                "text_response": `Ich habe deine Anfrage "${query}" verarbeitet und werde dir helfen, die relevanten Informationen auf der Karte anzuzeigen.`,
+                "data": {
+                    "query": query,
+                    "reasoning": "Processing general map query.",
+                    "command": {
+                        "action": {
+                            "type": "Zeigen",
+                            "confidence": 0.85
+                        }
+                    },
+                    "layers": {
+                        "layers": {
+                            "name": "Default Layer",
+                            "id": "1234",
+                            "confidence": 0.8
+                        }
+                    },
+                    "locations": {
+                        "locations": [
+                            {
+                                "name": "Hamburg",
+                                "coordinates": {
+                                    "latitude": 53.5511,
+                                    "longitude": 9.9937
+                                },
+                                "confidence": 0.9
+                            }
+                        ]
+                    }
                 },
                 "metadata": {
-                    "requestId": `mock-default-${Date.now()}`,
-                    "timestamp": new Date().toISOString()
+                    "num_agent_calls": 2,
+                    "reasoning": null
                 }
             };
         },
 
         /**
          * API call to get JSON Command
+         * Updated to handle new backend response structure
          */
         async requestMapCommand (query) {
             try {
@@ -750,36 +583,47 @@ export default {
                 console.log(`Requesting map command for query: "${query}"`);
 
                 // MOCK MODE: Comment out this block when backend is ready
+                /*
                 console.log("🔧 Using MOCK data (backend not available)");
                 const mockData = this.getMockResponse(query);
-                
+
                 // Simulate network delay
                 await new Promise(resolve => setTimeout(resolve, 500));
-                
-                this.executeMapCommand(mockData);
-                return mockData;
 
+                return this.executeMapCommand(mockData);
+                */
                 // REAL API MODE: Uncomment when backend is ready
-                /*
-                const response = await fetch("https://localhost:8443", {
+
+                const response = await fetch("http://localhost:8082/api/query", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({"input_text": query})
+                    body: JSON.stringify({
+                        "query": query,
+                        "include_reasoning": false,
+                        "language": "German"
+                    })
                 });
 
                 if (!response.ok) {
                     throw new Error(`API request failed: ${response.statusText}`);
                 }
 
-                const commandJson = await response.json();
+                const responseData = await response.json();
 
-                this.executeMapCommand(commandJson);
-                return commandJson;
-                */
+                // Validate response structure
+                if (!responseData.success) {
+                    throw new Error(responseData.text_response || "Backend returned unsuccessful response");
+                }
+
+                return this.executeMapCommand(responseData);
+                
             }
             catch (error) {
                 console.error("Error requesting map command:", error);
-                throw error;
+                return {
+                    success: false,
+                    message: "Es gab einen Fehler bei der Kommunikation mit dem Server."
+                };
             }
             finally {
                 this.isProcessing = false;
@@ -812,52 +656,64 @@ export default {
             return this.activatedLayersByCommand[this.lastCommand];
         },
 
+        /**
+         * Handle chat widget query - updated to use text_response from backend
+         */
         async onChatWidgetQuery (query, respond) {
             this.isProcessing = true;
             try {
-                await this.processNaturalLanguageQuery(query);
-                
-                const commandInfo = this.getCurrentCommandInfo();
-                if (commandInfo) {
-                    const layerCount = commandInfo.layers.length;
-                    const locationCount = commandInfo.locations.length;
-                    
-                    respond(`Befehl ausgeführt: ${layerCount} Layer aktiviert, ${locationCount} Standorte angezeigt.`);
+                const result = await this.processNaturalLanguageQuery(query);
+
+                if (result && result.success) {
+                    // Use the text_response from backend as the bot's response
+                    respond(result.message);
                 }
                 else {
-                    respond("Befehl ausgeführt.");
+                    // Fallback response if execution failed
+                    respond(result.message || "Es gab einen Fehler bei der Verarbeitung.");
                 }
             }
             catch (e) {
                 console.error("Query processing error:", e);
-                respond("Es gab einen Fehler bei der Verarbeitung.");
+                respond("Es gab einen Fehler bei der Verarbeitung deiner Anfrage.");
             }
             finally {
                 this.isProcessing = false;
             }
+        },
+
+        /**
+         * Set zoom
+         */
+        zoom () {
+            console.log("Setting zoom...")
+            this.setZoom(5);
         }
     }
 };
 </script>
 
 <template lang="html">
-    <div id="tool-chatWithYourMap" class="chatWithYourMap">
+    <div id="tool-chatWithYourMap"
+         class="chatWithYourMap"
+    >
         <div class="row h-100">
             <div class="col-12 col-md-12 col-lg-12 h100">
                 <div class="h-100">
-                    <p>Natural Language Map Control</p>
-                    <ChatWidget 
-                        :isProcessing="isProcessing" 
-                        @query-submitted="onChatWidgetQuery" 
+                    <ChatWidget
+                        :is-processing="isProcessing"
+                        @query-submitted="onChatWidgetQuery"
                     />
-                    
+
                     <!-- Command execution status -->
-                    <div v-if="isProcessing" class="processing-indicator">
+                    <div v-if="isProcessing"
+                         class="processing-indicator"
+                    >
                         <p>Processing command...</p>
                     </div>
-
-                    <!-- Current command info -->
-                    <div v-if="getCurrentCommandInfo()" class="command-info">
+                    <button class="btn" @click="zoom()">Zoom</button>
+                    <!-- Current command info (optional, can be uncommented for debugging) -->
+                    <!-- <div v-if="getCurrentCommandInfo()" class="command-info">
                         <h5>Active Command:</h5>
                         <p>
                             <strong>Layers:</strong> {{ getCurrentCommandInfo().layers.length }} active<br>
@@ -875,23 +731,25 @@ export default {
                         >
                             Clear All Commands
                         </button>
-                    </div>
+                    </div> -->
                 </div>
 
-                <!-- Command history -->
-                <div v-if="commandHistory.length > 0" class="command-history">
+                <!-- Command history (optional, can be uncommented for debugging) -->
+                <div v-if="commandHistory.length > 0"
+                     class="command-history"
+                >
                     <h4>Recent Commands:</h4>
                     <ul>
-                        <li 
-                            v-for="cmd in commandHistory.slice(-5)" 
-                            :key="cmd.metadata.requestId"
+                        <li
+                            v-for="cmd in commandHistory.slice(-5)"
+                            :key="cmd.requestId"
                         >
-                            <strong>{{ cmd.command.rawQuery }}</strong>
+                            <strong>{{ cmd.query }}</strong>
                             <br>
                             <small>
-                                Action: {{ cmd.command.action.type }} | 
-                                Layers: {{ cmd.command.layers?.length || 0 }} | 
-                                Locations: {{ cmd.command.locations?.length || 0 }}
+                                Action: {{ cmd.command.action.type }} |
+                                Layers: {{ cmd.layers?.layers ? 1 : 0 }} |
+                                Locations: {{ cmd.locations?.locations?.length || 0 }}
                             </small>
                         </li>
                     </ul>

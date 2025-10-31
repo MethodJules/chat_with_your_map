@@ -133,7 +133,7 @@ export default {
 }
 
 .chat-header {
-    background: linear-gradient(90deg, #004b8d 70%, #e2001a 100%);
+    background: linear-gradient(90deg, #004b8d 100%, #e2001a 100%);
     color: #fff;
     padding: 14px 18px;
     border-radius: 10px 10px 0 0;
@@ -262,7 +262,7 @@ export default {
 }
 
 .send-btn {
-    background: linear-gradient(90deg, #004b8d 70%, #e2001a 100%);
+    background: linear-gradient(90deg, #004b8d 100%, #e2001a 100%);
     color: #fff;
     border: none;
     border-radius: 18px;
