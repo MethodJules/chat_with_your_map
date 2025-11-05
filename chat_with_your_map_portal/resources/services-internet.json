@@ -1,4 +1,34 @@
-[
+[ 
+  {
+   "id":"27764",
+   "typ":"OAF",
+   "name":"StadtRAD-Stationen Hamburg",
+   "url":"https://api.hamburg.de/datasets/v1/stadtrad",
+   "collection":"stadtrad_stationen",
+   "gfiAttributes":{
+      "name":"Name",
+      "anzahl_bike":"Anzahl der freien Fahrräder",
+      "anzahl_cargobike_electric":"Anzahl der freien Lastenräder"
+   },
+   "gfiTheme":"default",
+   "datasets":[
+      {
+         "md_id":"D18F375E-FA5F-4998-AFF8-557969F44479",
+         "csw_url":"https://metaver.de/csw",
+         "show_doc_url":"https://metaver.de/trefferanzeige?cmd=doShowDocument&docuuid=",
+         "rs_id":"https://registry.gdi-de.org/id/de.hh/08d1158c-2b5b-49cb-91c3-0ca9fe22a955",
+         "md_name":"StadtRAD-Stationen Hamburg",
+         "bbox":"461468.96892897453,5916367.229806512,587010.9095989474,5980347.755797674",
+         "kategorie_opendata":[
+            "Verkehr"
+         ],
+         "kategorie_inspire":[
+            "kein INSPIRE-Thema"
+         ],
+         "kategorie_organisation":"Behörde für Verkehr und Mobilitätswende (BVM)"
+      }
+   ]
+  },
   {
     "id" : "20501",
     "name" : "de.hh.up:freizeitroute3",

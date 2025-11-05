@@ -7,6 +7,7 @@ const Config = {
         ["EPSG:25832", "+title=ETRS89/UTM 32N +proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"]
     ],
     layerConf: "./resources/services-internet.json",
+    // layerConf: "https://geodienste.hamburg.de/services-internet.json",
     restConf: "./resources/rest-services-internet.json",
     styleConf: "./resources/style_v3.json",
     wfsImgPath: "./resources/img/",

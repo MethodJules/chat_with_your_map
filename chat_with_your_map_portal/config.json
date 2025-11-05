@@ -107,6 +107,26 @@
           },
           {
             "type": "language"
+          },
+          {
+            "type": "filter",
+            "layerSelectorVisible": true,
+            "multiLayerSelector": true,
+            "layers": [
+              {
+                "title": "Statement Label",
+                "layerId": "harburg_radverkehr_Sonstiges",
+                "strategy": "active",
+                "snippets": [
+                  {
+                    "attrName": "related_sentence_statement_label"
+                  },
+                  {
+                    "attrName": "cluster"
+                  }
+                ]
+              }
+            ]
           }
         ]
       ]
@@ -199,37 +219,32 @@
             ]
           },
           {
-            "type": "routing",
-            "icon": "bi-signpost-2",
-            "geosearch": {
-              "type": "BKG",
-              "serviceId": "5",
-              "bbox": {
-                "CYCLING": "9.6,53.40,10.4,53.84"
+            "type": "print",
+            "printServiceId": "mapfish",
+            "printAppId": "master",
+            "filename": "Ausdruck",
+            "title": "Mein Titel",
+            "currentLayoutName": "A4 Hochformat",
+            "printMapMarker": true
+          },
+          {
+            "type": "contact",
+            "serviceId": "80001",
+            "includeSystemInfo": true,
+            "fileUpload": true,
+            "infoMessage": "",
+            "from": [
+              {
+                "email": "lgvgeoportal-hilfe@gv.hamburg.de",
+                "name": "LGVGeoportalHilfe"
               }
-            },
-            "geosearchReverse": {
-              "type": "BKG",
-              "serviceId": "5"
-            },
-            "directionsSettings": {
-              "type": "ORS",
-              "serviceId": "bkg_ors",
-              "speedProfile": "CAR",
-              "batchProcessing": {
-                "enabled": false,
-                "active": false
+            ],
+            "to": [
+              {
+                "email": "lgvgeoportal-hilfe@gv.hamburg.de",
+                "name": "LGVGeoportalHilfe"
               }
-            },
-            "isochronesSettings": {
-              "type": "ORS",
-              "serviceId": "bkg_ors",
-              "speedProfile": "CAR",
-              "batchProcessing": {
-                "enabled": false,
-                "active": false
-              }
-            }
+            ]
           }
         ]
       ]
@@ -403,6 +418,12 @@
             "schulname",
             "kapitelbezeichnung"
           ]
+        },
+        {
+          "id": "27764",
+          "name": "StadtRAD-Stationen Hamburg",
+          "typ": "OAF",
+          "visibility": false
         }
       ]
     }
